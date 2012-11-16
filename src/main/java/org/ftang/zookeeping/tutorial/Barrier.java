@@ -1,4 +1,4 @@
-package org.ftang.zookeeping;
+package org.ftang.zookeeping.tutorial;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
@@ -9,6 +9,7 @@ import org.apache.zookeeper.data.Stat;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Barrier
@@ -96,5 +97,39 @@ public class Barrier extends SyncPrimitive {
                 }
             }
         }
+    }
+
+    public static void barrierTest(String hostname, int number, int port) {
+        Barrier b = new Barrier(hostname, port, "/b1", number);
+        try{
+            boolean flag = b.enter();
+            log.debug("Entered barrier: " + number);
+            if(!flag) log.debug("Error when entering the barrier");
+        } catch (KeeperException e){
+
+        } catch (InterruptedException e){
+
+        }
+
+        // Generate random integer
+        Random rand = new Random();
+        int r = rand.nextInt(100);
+        // Loop for rand iterations
+        for (int i = 0; i < r; i++) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+
+            }
+        }
+        try{
+            b.leave();
+            zk.close();
+        } catch (KeeperException e){
+
+        } catch (InterruptedException e){
+
+        }
+        log.debug("Left barrier");
     }
 }

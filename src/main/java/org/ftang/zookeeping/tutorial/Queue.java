@@ -1,4 +1,4 @@
-package org.ftang.zookeeping;
+package org.ftang.zookeeping.tutorial;
 
 import com.google.common.base.Joiner;
 import org.apache.log4j.Logger;
@@ -99,4 +99,37 @@ public class Queue extends SyncPrimitive {
             }
         }
     }
+
+    public static Thread queueTest(final String host, final int port, final boolean producer) {
+        return new Thread() {
+            public void run() {
+                Queue q = new Queue(host, port, "/app1");
+
+                log.debug("Input: " + host);
+                int i;
+                Integer max = new Integer(20);
+
+                if (producer) {
+                    log.debug("Producer");
+                    for (i = 0; i < max; i++)
+                        try{
+                            q.produce(i);
+                        } catch (KeeperException e){ }
+                        catch (InterruptedException e){ }
+                } else {
+                    log.debug("Consumer");
+
+                    for (i = 0; i < max; i++) {
+                        try{
+                            int r = q.consume();
+                            log.debug("Item: " + r);
+                        } catch (KeeperException e){
+                            i--;
+                        } catch (InterruptedException e){ }
+                    }
+                }
+            }
+        };
+    }
+
 }
