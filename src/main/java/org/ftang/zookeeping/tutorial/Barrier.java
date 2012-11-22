@@ -35,7 +35,7 @@ public class Barrier extends SyncPrimitive {
         // Create barrier node
         if (zk != null) {
             try {
-                Stat s = zk.exists(root, false);
+                Stat s = zk.exists(root, true);
                 if (s == null) {
                     zk.create(root, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 }
@@ -48,7 +48,7 @@ public class Barrier extends SyncPrimitive {
 
         // My node name
         try {
-            name = new String(InetAddress.getLocalHost().getCanonicalHostName().toString());
+            name = new String(InetAddress.getLocalHost().getCanonicalHostName().toString()) + port;
         } catch (UnknownHostException e) {
             log.debug(e.toString());
         }
@@ -66,7 +66,7 @@ public class Barrier extends SyncPrimitive {
         zk.create(root + "/" + name, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         while (true) {
             synchronized (mutex) {
-                List<String> list = zk.getChildren(root, true);
+                List<String> list = zk.getChildren(root, false);
 
                 if (list.size() < size) {
                     mutex.wait();
@@ -89,7 +89,8 @@ public class Barrier extends SyncPrimitive {
         zk.delete(root + "/" + name, 0);
         while (true) {
             synchronized (mutex) {
-                List<String> list = zk.getChildren(root, true);
+                List<String> list = zk.getChildren(root, false);
+                log.debug(String.format("size of %s is %s", root, list.size()));
                 if (list.size() > 0) {
                     mutex.wait();
                 } else {
@@ -105,10 +106,10 @@ public class Barrier extends SyncPrimitive {
             boolean flag = b.enter();
             log.debug("Entered barrier: " + number);
             if(!flag) log.debug("Error when entering the barrier");
-        } catch (KeeperException e){
-
+        }  catch (KeeperException e){
+            log.error("KeeperException", e);
         } catch (InterruptedException e){
-
+            log.error("InterriptedException", e);
         }
 
         // Generate random integer
@@ -123,13 +124,14 @@ public class Barrier extends SyncPrimitive {
             }
         }
         try{
+            log.debug("Leaving barrier " + number);
             b.leave();
             zk.close();
         } catch (KeeperException e){
-
+            log.error("KeeperException", e);
         } catch (InterruptedException e){
-
+            log.error("InterriptedException", e);
         }
-        log.debug("Left barrier");
+        log.debug("Left barrier " + number);
     }
 }
