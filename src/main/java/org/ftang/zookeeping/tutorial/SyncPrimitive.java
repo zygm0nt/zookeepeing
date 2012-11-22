@@ -36,7 +36,7 @@ public class SyncPrimitive implements Watcher {
 
     synchronized public void process(WatchedEvent event) {
         synchronized (mutex) {
-            //log.debug("Process: " + event.getType());
+            log.debug("Process: " + event.getType());
             mutex.notify();
         }
     }
@@ -62,7 +62,4 @@ public class SyncPrimitive implements Watcher {
         for (Thread t : threads) t.start();
         for (Thread t : threads) t.join();
     }
-
-
-    
 }

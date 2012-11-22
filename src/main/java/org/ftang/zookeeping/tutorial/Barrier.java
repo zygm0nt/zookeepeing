@@ -3,6 +3,7 @@ package org.ftang.zookeeping.tutorial;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.Stat;
 
@@ -32,13 +33,16 @@ public class Barrier extends SyncPrimitive {
         this.root = root;
         this.size = size;
 
+        cleanup(root, root + "-ready");
+
         // Create barrier node
         if (zk != null) {
             try {
-                Stat s = zk.exists(root, true);
+                Stat s = zk.exists(root, false);
                 if (s == null) {
                     zk.create(root, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 }
+                zk.exists(root + "-ready", this);
             } catch (KeeperException e) {
                 log.debug("Keeper exception when instantiating queue: " + e.toString());
             } catch (InterruptedException e) {
@@ -50,7 +54,7 @@ public class Barrier extends SyncPrimitive {
         try {
             name = new String(InetAddress.getLocalHost().getCanonicalHostName().toString()) + port;
         } catch (UnknownHostException e) {
-            log.debug(e.toString());
+            log.error(e.toString());
         }
     }
 
@@ -63,7 +67,7 @@ public class Barrier extends SyncPrimitive {
      */
 
     boolean enter() throws KeeperException, InterruptedException{
-        zk.create(root + "/" + name, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        zk.create(root + "/" + name, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         while (true) {
             synchronized (mutex) {
                 List<String> list = zk.getChildren(root, false);
@@ -101,7 +105,10 @@ public class Barrier extends SyncPrimitive {
     }
 
     public static void barrierTest(String hostname, int number, int port) {
-        Barrier b = new Barrier(hostname, port, "/b1", number);
+        String root = "/b1";
+        String readyNode = root + "-ready";
+        
+        Barrier b = new Barrier(hostname, port, root, number);
         try{
             boolean flag = b.enter();
             log.debug("Entered barrier: " + number);
@@ -126,6 +133,8 @@ public class Barrier extends SyncPrimitive {
         try{
             log.debug("Leaving barrier " + number);
             b.leave();
+            if (zk.exists(readyNode, false) == null)
+                zk.create(readyNode, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             zk.close();
         } catch (KeeperException e){
             log.error("KeeperException", e);
@@ -133,5 +142,18 @@ public class Barrier extends SyncPrimitive {
             log.error("InterriptedException", e);
         }
         log.debug("Left barrier " + number);
+    }
+
+    private void cleanup(String root, String readyNode) {
+        try {
+            zk.delete(readyNode, 0);
+            zk.delete(root, 0);
+        } catch (KeeperException.NoNodeException e){
+            // other node did the cleanup
+        } catch (InterruptedException e){
+            log.error("InterriptedException", e);
+        } catch (KeeperException e){
+            log.error("KeeperException", e);
+        }
     }
 }
